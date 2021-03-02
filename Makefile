@@ -1,3 +1,4 @@
+PULL_SECRET ?= registry-config.json
 SNO_DIR = .
 ########################
 # User variables
@@ -70,7 +71,6 @@ $(SSH_KEY_PUB_PATH): $(SSH_KEY_PRIV_PATH)
 
 clean: destroy-libvirt
 	rm -rf $(INSTALLER_WORKDIR)
-	rm -rf registry-config.json
 	$(SNO_DIR)/bm-dell-clean.sh || true
 
 destroy-libvirt:
@@ -82,7 +82,7 @@ destroy-libvirt:
 
 # Render the install config from the template with the correct pull secret and SSH key
 $(INSTALL_CONFIG): $(INSTALL_CONFIG_TEMPLATE) checkenv $(SSH_KEY_PUB_PATH)
-	sed -e 's/YOUR_PULL_SECRET/$(PULL_SECRET)/' \
+	sed -e 's/YOUR_PULL_SECRET/$(shell cat $(PULL_SECRET))/' \
 	    -e 's|YOUR_SSH_KEY|$(shell cat $(SSH_KEY_PUB_PATH))|' \
 	    -e 's|INSTALLATION_DISK|$(INSTALLATION_DISK)|' \
 	    $(INSTALL_CONFIG_TEMPLATE) > $(INSTALL_CONFIG)
@@ -111,11 +111,8 @@ $(INSTALLER_ISO_PATH):
 	$(SNO_DIR)/download_live_iso.sh $@
 
 # Get the openshift-installer from the release image
-$(INSTALLER_BIN): registry-config.json
-	oc adm release extract --registry-config=registry-config.json --command=openshift-install --to ./bin $(RELEASE_IMAGE)
-
-registry-config.json:
-	jq -n '$(PULL_SECRET)' > registry-config.json
+$(INSTALLER_BIN):
+	oc adm release extract --command=openshift-install --to ./bin $(RELEASE_IMAGE)
 
 # Use the openshift-installer to generate BiP Live ISO ignition file
 $(BIP_LIVE_ISO_IGNITION): $(INSTALL_CONFIG_IN_WORKDIR) $(INSTALLER_BIN)
